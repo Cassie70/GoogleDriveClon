@@ -20,8 +20,7 @@ public class ServidorDatagrama {
 
         int port = 1234;
         printCurrentPath();
-        String command = "DIR chicha";
-        System.out.println(handlerCommand(command));
+        String command = "";
 
         try(DatagramSocket s = new DatagramSocket(port)){
             s.setReuseAddress(true);
@@ -57,20 +56,28 @@ public class ServidorDatagrama {
             case "LIST":
                 return listFolders();
             case "DIR":
-                dir(folderName);
-                return "direccion";
+                return dir(folderName);
+            case "BACK":
+                return back();
             default:
                 return "Comando no reconocido";
         }
     }
 
-    private static void dir(String folderName) {
-        File file = new File(folderName);
-        System.out.println("el path:"+file.getPath());
-        if(file.exists()){
-            currentPath = currentPath + File.separator + file.getPath();
+    private static String back() {
+        File currentDir = new File(currentPath);
+        if(currentDir.getParent() != null){
+            currentPath = currentDir.getParentFile().getPath();
         }
-        printCurrentPath();
+        return currentPath;
+    }
+
+    private static String dir(String folderName) {
+        File file = new File(currentPath + File.separator+folderName);
+        if(file.exists() && file.isDirectory()){
+            currentPath = file.getPath();
+        }
+        return currentPath;
     }
 
     private static boolean createFolder(String folderName) {
