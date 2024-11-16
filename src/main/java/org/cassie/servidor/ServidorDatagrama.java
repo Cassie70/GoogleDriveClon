@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.net.SocketException;
 
 public class ServidorDatagrama {
@@ -20,7 +21,7 @@ public class ServidorDatagrama {
 
         int port = 1234;
         printCurrentPath();
-        String command = "";
+        String command;
 
         try(DatagramSocket s = new DatagramSocket(port)){
             s.setReuseAddress(true);
@@ -33,7 +34,14 @@ public class ServidorDatagrama {
                     s.receive(p);
                     command = new String(p.getData(),0,p.getLength());
                     System.out.println("se ha recibidi datagrama desde"+p.getAddress());
-                    handlerCommand(command);
+
+                    String response = handlerCommand(command);
+                    byte[] responseBytes = response.getBytes();
+                    InetAddress clientAddress = p.getAddress();
+                    int clientPort = p.getPort();
+
+                    DatagramPacket responsePacket = new DatagramPacket(responseBytes, responseBytes.length, clientAddress, clientPort);
+                    s.send(responsePacket);
                 }
             }catch (IOException e){
                 System.err.println("Error durante la recepción del datagraama:"+e.getMessage());
@@ -48,20 +56,19 @@ public class ServidorDatagrama {
         command = instructions[0];
         String folderName = instructions.length > 1 ? instructions[1] : null;
 
-        switch (command){
-            case "CREATE":
-                return createFolder(folderName) ? "Folder Creado: "+folderName : "Folder NO Creado: "+folderName;
-            case "DELETE":
-                return deleteFolder(folderName) ? "Folder Borrado: "+folderName : "Folder NO borrado: "+folderName;
-            case "LIST":
-                return listFolders();
-            case "DIR":
-                return dir(folderName);
-            case "BACK":
-                return back();
-            default:
-                return "Comando no reconocido";
-        }
+        return switch (command) {
+            case "CREATE" ->
+                    createFolder(folderName) ? "Folder Creado: " + folderName : "Folder NO Creado: " + folderName;
+            case "DELETE" ->
+                    deleteFolder(folderName) ? "Folder Borrado: " + folderName : "Folder NO borrado: " + folderName;
+            case "LIST" ->
+                    listFolders();
+            case "DIR" ->
+                    dir(folderName);
+            case "BACK" ->
+                    back();
+            default -> "Comando no reconocido";
+        };
     }
 
     private static String back() {
