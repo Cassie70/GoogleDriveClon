@@ -73,21 +73,13 @@ public class ServidorDatagrama {
     }
 
     private static String upload(String folderName) {
-        final int tempPort = 1235 ;
-        boolean finish = false;
-        try(DatagramSocket temp = new DatagramSocket(tempPort)){
-            temp.setReuseAddress(true);
-            while (true){
-                byte[] b = new byte[65535];
-                DatagramPacket p = new DatagramPacket(b,b.length);
-                temp.receive(p);
+        boolean completed = false;
 
-            }
-        }catch (IOException e){
-            System.err.println("Error al iniciar la transferencia");
+        if(completed){
+            return "subida completada";
+        }else{
+            return "error al subir archivo";
         }
-
-        return "transferencia completada";
     }
 
     private static String back() {
