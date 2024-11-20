@@ -7,6 +7,7 @@ import java.net.InetAddress;
 import java.net.SocketException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.TreeMap;
 
 public class ServidorDatagrama {
 
@@ -77,23 +78,23 @@ public class ServidorDatagrama {
     private static String upload(String folderName) {
         boolean completed = false;
         final int port = 1235;
-        Map<Integer, Boolean> receivedFragments = new HashMap<>(); // Para rastrear fragmentos procesados
-        String outputFilePath = currentPath + File.separator+(new File(folderName)).getName(); // Ruta del archivo reconstruido
+        Map<Integer, byte[]> receivedFragments = new TreeMap<>();
+        File fileName = new File(folderName);
+        String outputFilePath = currentPath + File.separator+fileName.getName();
 
         try (DatagramSocket tempServer = new DatagramSocket(port);
              FileOutputStream fos = new FileOutputStream(outputFilePath)) {
 
             while (true) {
-                byte[] bytes = new byte[65535]; // Tamaño máximo permitido por UDP
+                byte[] bytes = new byte[65535];
                 DatagramPacket packet = new DatagramPacket(bytes, bytes.length);
                 tempServer.receive(packet);
 
-                // Procesar el fragmento recibido
-                DataInputStream dis = new DataInputStream(new ByteArrayInputStream(packet.getData()));
 
-                int packetIndex = dis.readInt(); // Índice del fragmento
-                int totalPackets = dis.readInt(); // Número total de fragmentos
-                int packetSize = dis.readInt(); // Tamaño real del fragmento
+                DataInputStream dis = new DataInputStream(new ByteArrayInputStream(packet.getData()));
+                int packetIndex = dis.readInt();
+                int totalPackets = dis.readInt();
+                int packetSize = dis.readInt();
 
                 if (packetIndex == -1) {
                     // Si el fragmento especial indica el fin de la transmisión
@@ -106,12 +107,10 @@ public class ServidorDatagrama {
                 byte[] fileData = new byte[packetSize];
                 dis.readFully(fileData);
 
-                // Escribir los datos en el archivo, asegurándonos de no sobrescribir fragmentos ya procesados
+
                 if (!receivedFragments.containsKey(packetIndex)) {
-                    fos.write(fileData); // Escribe directamente los datos en el archivo
-                    fos.flush(); // Asegurar que los datos se escriban inmediatamente
-                    receivedFragments.put(packetIndex, true); // Marcar el fragmento como recibido
-                    System.out.println("Fragmento " + packetIndex + " guardado.");
+                    receivedFragments.put(packetIndex, fileData);
+                    System.out.println("Fragmento " + packetIndex + " guardado."+" tamaño "+ packetSize);
                 }
 
                 // Enviar un ACK de confirmación para el fragmento
@@ -125,6 +124,12 @@ public class ServidorDatagrama {
                 );
                 tempServer.send(ackPacket);
                 System.out.println("ACK enviado para fragmento " + packetIndex);
+            }
+            int j = 0;
+            for (byte[] fragment : receivedFragments.values()) {
+                System.out.println("guardando fragmento:"+j);
+                j++;
+                fos.write(fragment);
             }
 
         } catch (IOException e) {
@@ -167,7 +172,7 @@ public class ServidorDatagrama {
     private static String listFolders() {
         File rootDir = new File(currentPath);
         StringBuilder folderList = new StringBuilder();
-        File[] folders = rootDir.listFiles(File::isDirectory);
+        File[] folders = rootDir.listFiles(File::exists);
 
         if (folders != null && folders.length > 0) {
             for (File folder : folders) {

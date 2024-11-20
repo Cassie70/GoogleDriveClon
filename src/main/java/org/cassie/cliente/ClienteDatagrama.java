@@ -58,24 +58,26 @@ public class ClienteDatagrama {
     private static boolean handleFileUpload(String route, DatagramSocket tempClient, InetAddress address) {
         final int port = 1235;
         final int windowSize = 3;
-        final int bufferSize = 1024; // Tamaño total del datagrama
-        int firstWindowIndex = 0; // Primer índice de la ventana actual
+        final int bufferSize = 1024;
+        int firstWindowIndex = 0;
         Map<Integer, DatagramPacket> packets = new HashMap<>(); // Paquetes pendientes de ACK
 
         try (FileInputStream fis = new FileInputStream(route)) {
-            byte[] fileBuffer = new byte[bufferSize - 12]; // Reservar espacio para el encabezado
+            byte[] fileBuffer = new byte[bufferSize - 12];
             int bytesRead;
             int fragmentId = 0;
-
-            while ((bytesRead = fis.read(fileBuffer)) != -1 || !packets.isEmpty()) {
+            bytesRead = fis.read(fileBuffer);
+            while (true) {
                 while (packets.size() < windowSize && bytesRead != -1) {
                     ByteArrayOutputStream baos = new ByteArrayOutputStream();
                     DataOutputStream dos = new DataOutputStream(baos);
 
+                    // Prepara el paquete con los datos actuales
                     dos.writeInt(fragmentId);
                     dos.writeInt(windowSize);
                     dos.writeInt(bytesRead);
                     dos.write(fileBuffer, 0, bytesRead);
+                    dos.flush();
 
                     byte[] buffer = baos.toByteArray();
                     DatagramPacket packet = new DatagramPacket(buffer, buffer.length, address, port);
@@ -84,35 +86,39 @@ public class ClienteDatagrama {
                     tempClient.send(packet);
                     System.out.println("Fragmento " + fragmentId + " enviado con " + bytesRead + " bytes.");
                     fragmentId++;
-                    bytesRead = fis.read(fileBuffer);
+
+                    // Lee la próxima porción del archivo
+                    if ((bytesRead = fis.read(fileBuffer)) == -1) {
+                        break;
+                    }
                 }
 
+                // Procesa ACKs
                 try {
                     tempClient.setSoTimeout(1000);
-                    byte[] ackBuffer = new byte[bufferSize - 12];
+                    byte[] ackBuffer = new byte[bufferSize];
                     DatagramPacket ackPacket = new DatagramPacket(ackBuffer, ackBuffer.length);
 
-                    while (true) {
-                        tempClient.receive(ackPacket);
-                        DataInputStream dis = new DataInputStream(new ByteArrayInputStream(ackPacket.getData()));
+                    tempClient.receive(ackPacket);
+                    DataInputStream dis = new DataInputStream(new ByteArrayInputStream(ackPacket.getData()));
 
-                        int ackId = dis.readInt();
-                        System.out.println("ACK recibido para fragmento " + ackId);
+                    int ackId = dis.readInt();
+                    System.out.println("ACK recibido para fragmento " + ackId);
 
-                        if (packets.containsKey(ackId)) {
-                            packets.remove(ackId);
-                            firstWindowIndex++;
-                        }
-
-                        if (packets.isEmpty() && bytesRead == -1) {
-                            break;
-                        }
+                    if (packets.containsKey(ackId)) {
+                        packets.remove(ackId);
+                        firstWindowIndex++;
                     }
                 } catch (SocketTimeoutException e) {
                     System.out.println("Timeout alcanzado, retransmitiendo paquetes...");
                     for (DatagramPacket packet : packets.values()) {
                         tempClient.send(packet);
                     }
+                }
+
+                // Verifica si se ha completado la transmisión
+                if (packets.isEmpty() && bytesRead == -1) {
+                    break;
                 }
             }
 
