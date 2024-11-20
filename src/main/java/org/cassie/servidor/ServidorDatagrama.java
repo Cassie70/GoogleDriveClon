@@ -5,6 +5,8 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.util.HashMap;
+import java.util.Map;
 
 public class ServidorDatagrama {
 
@@ -75,32 +77,68 @@ public class ServidorDatagrama {
     private static String upload(String folderName) {
         boolean completed = false;
         final int port = 1235;
-        try(DatagramSocket tempServer = new DatagramSocket(port)) {
-            while (!completed){
-                byte[] bytes = new byte[65535];
-                DatagramPacket packet = new DatagramPacket(bytes,bytes.length);
+        Map<Integer, Boolean> receivedFragments = new HashMap<>(); // Para rastrear fragmentos procesados
+        String outputFilePath = currentPath + File.separator+(new File(folderName)).getName(); // Ruta del archivo reconstruido
+
+        try (DatagramSocket tempServer = new DatagramSocket(port);
+             FileOutputStream fos = new FileOutputStream(outputFilePath)) {
+
+            while (true) {
+                byte[] bytes = new byte[65535]; // Tamaño máximo permitido por UDP
+                DatagramPacket packet = new DatagramPacket(bytes, bytes.length);
                 tempServer.receive(packet);
+
+                // Procesar el fragmento recibido
                 DataInputStream dis = new DataInputStream(new ByteArrayInputStream(packet.getData()));
 
-                int packetIndex = dis.readInt();
-                int totalPackets = dis.readInt();
-                int packetSize = dis.readInt();
+                int packetIndex = dis.readInt(); // Índice del fragmento
+                int totalPackets = dis.readInt(); // Número total de fragmentos
+                int packetSize = dis.readInt(); // Tamaño real del fragmento
 
-                System.out.println("paquete recibido: "+packetIndex+"/"+totalPackets+" de tamaño: "+packetSize);
-                tempServer.send(packet);
-                System.out.println("ACK enviado");
-                if(packetIndex == -1) completed=true;
-                System.out.println("Todos los paquetes se recibieron");
+                if (packetIndex == -1) {
+                    // Si el fragmento especial indica el fin de la transmisión
+                    completed = true;
+                    System.out.println("Todos los paquetes se recibieron.");
+                    break;
+                }
+
+                // Leer los datos del fragmento
+                byte[] fileData = new byte[packetSize];
+                dis.readFully(fileData);
+
+                // Escribir los datos en el archivo, asegurándonos de no sobrescribir fragmentos ya procesados
+                if (!receivedFragments.containsKey(packetIndex)) {
+                    fos.write(fileData); // Escribe directamente los datos en el archivo
+                    fos.flush(); // Asegurar que los datos se escriban inmediatamente
+                    receivedFragments.put(packetIndex, true); // Marcar el fragmento como recibido
+                    System.out.println("Fragmento " + packetIndex + " guardado.");
+                }
+
+                // Enviar un ACK de confirmación para el fragmento
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                DataOutputStream dos = new DataOutputStream(baos);
+                dos.writeInt(packetIndex); // ACK con el índice del fragmento confirmado
+                byte[] ackBytes = baos.toByteArray();
+
+                DatagramPacket ackPacket = new DatagramPacket(
+                        ackBytes, ackBytes.length, packet.getAddress(), packet.getPort()
+                );
+                tempServer.send(ackPacket);
+                System.out.println("ACK enviado para fragmento " + packetIndex);
             }
-        }catch (IOException e){
-            System.err.println("error al iniciar la subida: "+e.getMessage());
-        }
-        if(completed){
-            return "subida completada";
-        }else{
+
+        } catch (IOException e) {
+            System.err.println("Error al iniciar la subida: " + e.getMessage());
             return "error al subir archivo";
         }
+
+        if (completed) {
+            return "Subida completada, archivo reconstruido en: " + outputFilePath;
+        } else {
+            return "Error al subir archivo";
+        }
     }
+
 
     private static String back() {
         File currentDir = new File(currentPath);

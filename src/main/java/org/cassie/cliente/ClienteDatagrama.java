@@ -58,7 +58,7 @@ public class ClienteDatagrama {
     private static boolean handleFileUpload(String route, DatagramSocket tempClient, InetAddress address) {
         final int port = 1235;
         final int windowSize = 3;
-        final int bufferSize = 24; // Tamaño total del datagrama
+        final int bufferSize = 1024; // Tamaño total del datagrama
         int firstWindowIndex = 0; // Primer índice de la ventana actual
         Map<Integer, DatagramPacket> packets = new HashMap<>(); // Paquetes pendientes de ACK
 
