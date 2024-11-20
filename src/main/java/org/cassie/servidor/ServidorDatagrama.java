@@ -5,7 +5,9 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.security.spec.RSAOtherPrimeInfo;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -80,8 +82,9 @@ public class ServidorDatagrama {
         final int port = 1235;
         Map<Integer, byte[]> receivedFragments = new TreeMap<>();
         File fileName = new File(folderName);
-        String outputFilePath = currentPath + File.separator+fileName.getName();
 
+        String outputFilePath = currentPath + File.separator+fileName.getName();
+        int expectedPacket = 0;
         try (DatagramSocket tempServer = new DatagramSocket(port);
              FileOutputStream fos = new FileOutputStream(outputFilePath)) {
 
@@ -93,7 +96,7 @@ public class ServidorDatagrama {
 
                 DataInputStream dis = new DataInputStream(new ByteArrayInputStream(packet.getData()));
                 int packetIndex = dis.readInt();
-                int totalPackets = dis.readInt();
+                int windowsSize = dis.readInt();
                 int packetSize = dis.readInt();
 
                 if (packetIndex == -1) {
@@ -108,28 +111,39 @@ public class ServidorDatagrama {
                 dis.readFully(fileData);
 
 
-                if (!receivedFragments.containsKey(packetIndex)) {
-                    receivedFragments.put(packetIndex, fileData);
-                    System.out.println("Fragmento " + packetIndex + " guardado."+" tamaño "+ packetSize);
+                if(packetIndex == expectedPacket ){
+                    fos.write(fileData);
+                    fos.flush();
+                    System.out.println("Fragmento "+expectedPacket +" añadido");
+                }else{
+                    if (!receivedFragments.containsKey(packetIndex)) {
+                        receivedFragments.put(packetIndex, fileData);
+                        System.out.println("Fragmento " + packetIndex + " guardado."+" tamaño "+ packetSize);
+                    }
                 }
+                if(receivedFragments.size()<= windowsSize) {
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    DataOutputStream dos = new DataOutputStream(baos);
+                    dos.writeInt(packetIndex); // ACK con el índice del fragmento confirmado
+                    byte[] ackBytes = baos.toByteArray();
 
-                // Enviar un ACK de confirmación para el fragmento
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                DataOutputStream dos = new DataOutputStream(baos);
-                dos.writeInt(packetIndex); // ACK con el índice del fragmento confirmado
-                byte[] ackBytes = baos.toByteArray();
-
-                DatagramPacket ackPacket = new DatagramPacket(
-                        ackBytes, ackBytes.length, packet.getAddress(), packet.getPort()
-                );
-                tempServer.send(ackPacket);
-                System.out.println("ACK enviado para fragmento " + packetIndex);
-            }
-            int j = 0;
-            for (byte[] fragment : receivedFragments.values()) {
-                System.out.println("guardando fragmento:"+j);
-                j++;
-                fos.write(fragment);
+                    DatagramPacket ackPacket = new DatagramPacket(
+                            ackBytes, ackBytes.length, packet.getAddress(), packet.getPort()
+                    );
+                    tempServer.send(ackPacket);
+                    System.out.println("ACK enviado para fragmento " + packetIndex);
+                    expectedPacket++;
+                }else{
+                    if(!receivedFragments.isEmpty()){
+                        Iterator<Map.Entry<Integer, byte[]>> iterator = receivedFragments.entrySet().iterator();
+                        while (iterator.hasNext()) {
+                            Map.Entry<Integer, byte[]> entry = iterator.next();
+                            fos.write(entry.getValue());
+                            iterator.remove();
+                            System.out.println("Fragmento "+entry.getKey()+ "añadido");
+                        }
+                    }
+                }
             }
 
         } catch (IOException e) {

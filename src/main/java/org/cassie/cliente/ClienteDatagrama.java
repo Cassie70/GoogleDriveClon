@@ -38,12 +38,22 @@ public class ClienteDatagrama {
     private static void sendCommand(DatagramSocket socket, InetAddress address, int port, String command) throws IOException {
         byte[] buffer = command.getBytes();
         DatagramPacket requestPacket = new DatagramPacket(buffer, buffer.length, address, port);
-        socket.send(requestPacket);
-
         String[] parts = command.split(" ");
-        if(Objects.equals(parts[0], "UPLOAD")){
-            if (parts.length == 1)
+
+
+        if(!Objects.equals(parts[0], "UPLOAD")){
+            socket.send(requestPacket);
+        }else{
+            if(parts.length == 1 )
                 return;
+            File fileName = new File(parts[1]);
+            if (!fileName.exists()) {
+                return;
+            }
+            if (!fileName.isFile()) {
+                return ;
+            }
+            socket.send(requestPacket);
             if (!handleFileUpload(parts[1], socket, address))
                 return;
         }
@@ -57,7 +67,7 @@ public class ClienteDatagrama {
 
     private static boolean handleFileUpload(String route, DatagramSocket tempClient, InetAddress address) {
         final int port = 1235;
-        final int windowSize = 3;
+        final int windowSize = 5;
         final int bufferSize = 1024;
         int firstWindowIndex = 0;
         Map<Integer, DatagramPacket> packets = new HashMap<>(); // Paquetes pendientes de ACK
@@ -138,8 +148,9 @@ public class ClienteDatagrama {
 
         } catch (IOException e) {
             System.err.println("Error al enviar el archivo: " + e.getMessage());
+            return false;
         }
-        return false;
+
     }
 
 }
