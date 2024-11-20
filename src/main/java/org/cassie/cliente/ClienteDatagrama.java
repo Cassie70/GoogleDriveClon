@@ -52,6 +52,11 @@ public class ClienteDatagrama {
     }
 
     private static boolean handleFileUpload(String route) {
+        try(DatagramSocket tempClient = new DatagramSocket()){
+
+        }catch(IOException e){
+
+        }
         return false;
     }
 

@@ -74,7 +74,25 @@ public class ServidorDatagrama {
 
     private static String upload(String folderName) {
         boolean completed = false;
+        final int port = 1235;
+        try(DatagramSocket tempServer = new DatagramSocket(port)) {
+            while (!completed){
+                byte[] bytes = new byte[65535];
+                DatagramPacket packet = new DatagramPacket(bytes,bytes.length);
+                tempServer.receive(packet);
+                DataInputStream dis = new DataInputStream(new ByteArrayInputStream(packet.getData()));
 
+                int packetIndex = dis.readInt();
+                int totalPackets = dis.readInt();
+                int packetSize = dis.readInt();
+
+                System.out.println("paquete recibido: "+packetIndex+"/"+totalPackets+" de tamaño: "+packetSize);
+
+                if(packetIndex >= packetSize) completed = true;
+            }
+        }catch (IOException e){
+            System.err.println("error al iniciar la subida: "+e.getMessage());
+        }
         if(completed){
             return "subida completada";
         }else{
