@@ -5,8 +5,6 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
-import java.security.spec.RSAOtherPrimeInfo;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
@@ -20,7 +18,8 @@ public class ServidorDatagrama {
 
         File rootDir = new File(ROOT);
         if (!rootDir.exists()) {
-            rootDir.mkdir();
+            if(rootDir.mkdir())
+                System.out.println("se creó la carpeta raiz");
         }
 
         int port = 1234;
@@ -78,7 +77,6 @@ public class ServidorDatagrama {
     }
 
     private static String upload(String folderName) {
-        boolean completed = false;
         final int port = 1235;
         Map<Integer, byte[]> receivedFragments = new TreeMap<>();
         File fileName = new File(folderName);
@@ -100,8 +98,6 @@ public class ServidorDatagrama {
                 int packetSize = dis.readInt();
 
                 if (packetIndex == -1) {
-                    // Si el fragmento especial indica el fin de la transmisión
-                    completed = true;
                     System.out.println("Todos los paquetes se recibieron.");
                     break;
                 }
@@ -151,11 +147,8 @@ public class ServidorDatagrama {
             return "error al subir archivo";
         }
 
-        if (completed) {
-            return "Subida completada, archivo reconstruido en: " + outputFilePath;
-        } else {
-            return "Error al subir archivo";
-        }
+        return "Subida completada, archivo reconstruido en: " + outputFilePath;
+
     }
 
 

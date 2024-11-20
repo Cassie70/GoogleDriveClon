@@ -69,7 +69,6 @@ public class ClienteDatagrama {
         final int port = 1235;
         final int windowSize = 5;
         final int bufferSize = 1024;
-        int firstWindowIndex = 0;
         Map<Integer, DatagramPacket> packets = new HashMap<>(); // Paquetes pendientes de ACK
 
         try (FileInputStream fis = new FileInputStream(route)) {
@@ -77,7 +76,7 @@ public class ClienteDatagrama {
             int bytesRead;
             int fragmentId = 0;
             bytesRead = fis.read(fileBuffer);
-            while (true) {
+            do {
                 while (packets.size() < windowSize && bytesRead != -1) {
                     ByteArrayOutputStream baos = new ByteArrayOutputStream();
                     DataOutputStream dos = new DataOutputStream(baos);
@@ -115,10 +114,7 @@ public class ClienteDatagrama {
                     int ackId = dis.readInt();
                     System.out.println("ACK recibido para fragmento " + ackId);
 
-                    if (packets.containsKey(ackId)) {
-                        packets.remove(ackId);
-                        firstWindowIndex++;
-                    }
+                    packets.remove(ackId);
                 } catch (SocketTimeoutException e) {
                     System.out.println("Timeout alcanzado, retransmitiendo paquetes...");
                     for (DatagramPacket packet : packets.values()) {
@@ -127,10 +123,7 @@ public class ClienteDatagrama {
                 }
 
                 // Verifica si se ha completado la transmisión
-                if (packets.isEmpty() && bytesRead == -1) {
-                    break;
-                }
-            }
+            } while (!packets.isEmpty() || bytesRead != -1);
 
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             DataOutputStream dos = new DataOutputStream(baos);
