@@ -32,8 +32,8 @@ public class ServidorDatagrama {
                     DatagramPacket p = new DatagramPacket(b,b.length);
                     s.receive(p);
                     command = new String(p.getData(),0,p.getLength());
-                    System.out.println("se ha recibidi datagrama desde"+p.getAddress());
-
+                    System.out.println("se ha recibido datagrama desde"+p.getAddress());
+                    System.out.println(command);
                     String response = handlerCommand(command);
                     byte[] responseBytes = response.getBytes();
                     InetAddress clientAddress = p.getAddress();
@@ -87,8 +87,10 @@ public class ServidorDatagrama {
                 int packetSize = dis.readInt();
 
                 System.out.println("paquete recibido: "+packetIndex+"/"+totalPackets+" de tamaño: "+packetSize);
-
-                if(packetIndex >= packetSize) completed = true;
+                tempServer.send(packet);
+                System.out.println("ACK enviado");
+                if(packetIndex == -1) completed=true;
+                System.out.println("Todos los paquetes se recibieron");
             }
         }catch (IOException e){
             System.err.println("error al iniciar la subida: "+e.getMessage());
