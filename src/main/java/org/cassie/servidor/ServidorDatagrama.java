@@ -1,7 +1,6 @@
 package org.cassie.servidor;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -63,12 +62,32 @@ public class ServidorDatagrama {
                     deleteFolder(folderName) ? "Folder Borrado: " + folderName : "Folder NO borrado: " + folderName;
             case "LIST" ->
                     listFolders();
-            case "DIR" ->
-                    dir(folderName);
+            case "CD" ->
+                    CD(folderName);
             case "BACK" ->
                     back();
+            case "UPLOAD" ->
+                upload(folderName);
             default -> "Comando no reconocido";
         };
+    }
+
+    private static String upload(String folderName) {
+        final int tempPort = 1235 ;
+        boolean finish = false;
+        try(DatagramSocket temp = new DatagramSocket(tempPort)){
+            temp.setReuseAddress(true);
+            while (true){
+                byte[] b = new byte[65535];
+                DatagramPacket p = new DatagramPacket(b,b.length);
+                temp.receive(p);
+
+            }
+        }catch (IOException e){
+            System.err.println("Error al iniciar la transferencia");
+        }
+
+        return "transferencia completada";
     }
 
     private static String back() {
@@ -79,7 +98,7 @@ public class ServidorDatagrama {
         return currentPath;
     }
 
-    private static String dir(String folderName) {
+    private static String CD(String folderName) {
         File file = new File(currentPath + File.separator+folderName);
         if(file.exists() && file.isDirectory()){
             currentPath = file.getPath();
